@@ -1,0 +1,25 @@
+# 中文語音辨識工具 - Python 依賴套件
+# Python 3.9+ 建議
+
+# === 桌面 / Web GUI ===
+PyQt6>=6.5.0
+streamlit>=1.54.0
+streamlit-webrtc>=0.44.0
+av>=10.0.0
+
+# === 語音辨識引擎 ===
+# 使用 Faster-Whisper（比 OpenAI Whisper 更快、記憶體用量更低）
+faster-whisper>=1.0.0
+
+# === 音訊處理 ===
+# 支援 .mp3, .wav, .m4a 的讀取與格式轉換
+# 注意：pydub 需搭配系統已安裝的 FFmpeg 才能處理 mp3/m4a
+pydub>=0.25.0
+
+# === 數值與音訊陣列 ===
+numpy>=1.24.0
+
+# === 以下為 faster-whisper 的間接依賴，通常會自動安裝 ===
+# ctranslate2
+# av
+# onnxruntime 或 onnxruntime-gpu（若使用 GPU 加速）
