@@ -22,6 +22,10 @@ def transcribe_audio(
     model_size: str = "base",
     beam_size: int = 8,
     initial_prompt: Optional[str] = None,
+    vad_filter: bool = True,
+    no_speech_threshold: Optional[float] = 0.4,
+    log_prob_threshold: Optional[float] = -0.8,
+    repetition_penalty: Optional[float] = None,
 ) -> tuple[str, list[dict]]:
     """
     辨識音訊檔案，回傳完整文字與分段結果（含時間戳）
@@ -38,13 +42,15 @@ def transcribe_audio(
     transcribe_kw: dict = {
         "language": language,
         "beam_size": beam_size,
-        "vad_filter": True,
+        "vad_filter": vad_filter,
         "condition_on_previous_text": True,
-        "no_speech_threshold": 0.4,
-        "log_prob_threshold": -0.8,
+        "no_speech_threshold": no_speech_threshold,
+        "log_prob_threshold": log_prob_threshold,
     }
     if initial_prompt and initial_prompt.strip():
         transcribe_kw["initial_prompt"] = initial_prompt.strip()
+    if repetition_penalty is not None and repetition_penalty > 1.0:
+        transcribe_kw["repetition_penalty"] = repetition_penalty
 
     segments_iter, info = model.transcribe(str(path), **transcribe_kw)
 

@@ -167,7 +167,7 @@ else:
 # ========== 即時辨識分頁 ==========
 with tab_realtime:
     st.subheader("⚡ 即時辨識")
-    st.caption("開啟麥克風後，邊講邊輸出辨識文字（音訊自動重採樣至 16kHz，與麥克風錄音一致）")
+    st.caption("開啟麥克風後，邊講邊輸出辨識文字（每 5 秒輸出一次，音訊重採樣至 16kHz）")
     st.info(
         "即時辨識需瀏覽器麥克風權限。建議使用 Chrome 或 Edge。"
         "若連線失敗，請改用「上傳檔案」或「麥克風錄音」分頁。"
@@ -183,7 +183,7 @@ with tab_realtime:
     rt_transcript = st.session_state.realtime_transcript
 
     # 即時辨識使用較小模型以提升速度（tiny 最快、亂碼較少）
-    rt_model = st.selectbox("即時辨識模型", ["tiny", "base", "small"], index=0, key="rt_model", help="tiny 速度最快")
+    rt_model = st.selectbox("即時辨識模型", ["small", "base", "tiny"], index=0, key="rt_model", help="small 辨識最準，tiny 最快")
 
     # 建立即時辨識器（模型變更時重建）
     need_new_transcriber = (
@@ -197,7 +197,7 @@ with tab_realtime:
             result_queue=rt_queue,
             model_size=rt_model,
             language=language,
-            chunk_duration_sec=2.5,
+            chunk_duration_sec=5.0,
             sample_rate=48000,
         )
         worker = threading.Thread(
@@ -234,11 +234,16 @@ with tab_realtime:
                 except queue.Empty:
                     break
                 for frame in audio_frames:
-                    samples = frame.to_ndarray()
-                    if samples.ndim > 1:
-                        samples = samples.mean(axis=0)
+                    arr = frame.to_ndarray()
+                    # PyAV 回傳 (channels, samples)，tobytes() 為 planar；
+                    # pydub 需 interleaved (L,R,L,R...)，故需 transpose
+                    if arr.ndim == 2 and arr.shape[0] > 1:
+                        arr = arr.T.flatten()  # (ch,s) -> (s,ch) flatten -> interleaved
+                    raw = arr.tobytes()
+                    sw = getattr(frame.format, "bytes", 2) or 2
                     sr = getattr(frame, "sample_rate", None) or 48000
-                    rt_transcriber.add_frame(samples, sample_rate=sr)
+                    ch = len(getattr(frame.layout, "channels", [0])) or 1
+                    rt_transcriber.add_frame(raw, sw, sr, ch)
                 # 收取辨識結果
                 while True:
                     try:

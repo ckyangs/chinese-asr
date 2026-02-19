@@ -15,9 +15,14 @@ faster-whisper>=1.0.0
 # 支援 .mp3, .wav, .m4a 的讀取與格式轉換
 # 注意：pydub 需搭配系統已安裝的 FFmpeg 才能處理 mp3/m4a
 pydub>=0.25.0
+# Python 3.13+ 已移除 audioop，pydub 依賴此模組
+audioop-lts>=0.2.0
 
 # === 數值與音訊陣列 ===
 numpy>=1.24.0
+
+# === 簡繁轉換（即時辨識輸出強制繁體）===
+zhconv>=1.4.0
 
 # === 以下為 faster-whisper 的間接依賴，通常會自動安裝 ===
 # ctranslate2
