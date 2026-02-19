@@ -1,8 +1,10 @@
+# -*- coding: utf-8 -*-
 """
 中文語音辨識工具 - Streamlit 版本
 支援 .mp3, .wav, .m4a 上傳，或麥克風即時錄音，使用 Faster-Whisper 辨識
 """
 
+import html
 import queue
 import threading
 import time
@@ -13,6 +15,11 @@ from streamlit_webrtc import WebRtcMode, webrtc_streamer
 
 from src.core.realtime import RealtimeTranscriber
 from src.core.transcriber import transcribe_audio
+
+
+def _escape_html(text: str) -> str:
+    """跳脫 HTML 特殊字元，確保正確顯示"""
+    return html.escape(text)
 
 
 def _format_ts(seconds: float) -> str:
@@ -49,9 +56,9 @@ with st.sidebar:
     st.subheader("辨識設定")
     model_size = st.selectbox(
         "模型大小",
-        ["tiny", "base", "small", "medium", "large-v2"],
+        ["tiny", "base", "small", "medium", "large-v2", "XA9/faster-whisper-large-v2-zh-TW"],
         index=2,
-        help="small/medium 準確度較高，large-v2 最高但較慢",
+        help="zh-TW 為繁體中文專用模型，輸出較正確",
         key="model_size",
     )
     language = st.text_input("語言代碼", value="zh", help="zh=中文, en=英文", key="language")
@@ -160,7 +167,7 @@ else:
 # ========== 即時辨識分頁 ==========
 with tab_realtime:
     st.subheader("⚡ 即時辨識")
-    st.caption("開啟麥克風後，邊講邊輸出辨識文字（約每 2.5 秒輸出一次）")
+    st.caption("開啟麥克風後，邊講邊輸出辨識文字（音訊自動重採樣至 16kHz，與麥克風錄音一致）")
     st.info(
         "即時辨識需瀏覽器麥克風權限。建議使用 Chrome 或 Edge。"
         "若連線失敗，請改用「上傳檔案」或「麥克風錄音」分頁。"
@@ -175,11 +182,20 @@ with tab_realtime:
     rt_queue = st.session_state.realtime_queue
     rt_transcript = st.session_state.realtime_transcript
 
-    # 建立即時辨識器（僅建立一次）
-    if "realtime_transcriber" not in st.session_state:
+    # 即時辨識使用較小模型以提升速度（tiny 最快、亂碼較少）
+    rt_model = st.selectbox("即時辨識模型", ["tiny", "base", "small"], index=0, key="rt_model", help="tiny 速度最快")
+
+    # 建立即時辨識器（模型變更時重建）
+    need_new_transcriber = (
+        "realtime_transcriber" not in st.session_state
+        or st.session_state.realtime_transcriber.model_size != rt_model
+    )
+    if need_new_transcriber:
+        if "realtime_transcriber" in st.session_state:
+            del st.session_state["realtime_transcriber"]
         st.session_state.realtime_transcriber = RealtimeTranscriber(
             result_queue=rt_queue,
-            model_size=model_size,
+            model_size=rt_model,
             language=language,
             chunk_duration_sec=2.5,
             sample_rate=48000,
@@ -233,7 +249,10 @@ with tab_realtime:
                 full_text = "".join(rt_transcript)
                 with transcript_placeholder.container():
                     st.markdown("**即時辨識結果**")
-                    st.code(full_text or "（辨識中...）", language=None)
+                    if full_text:
+                        st.markdown(f"<div style='white-space: pre-wrap; font-size: 1rem; line-height: 1.6;'>{_escape_html(full_text)}</div>", unsafe_allow_html=True)
+                    else:
+                        st.info("（辨識中...）")
         except Exception as e:
             st.error(f"即時辨識錯誤：{e}")
 

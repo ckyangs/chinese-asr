@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Faster-Whisper 語音辨識引擎封裝"""
 
 from pathlib import Path

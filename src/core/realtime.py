@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """即時語音辨識：音訊緩衝與背景辨識"""
 
 import queue
@@ -11,15 +12,42 @@ import numpy as np
 from .transcriber import transcribe_audio
 
 
+TARGET_SAMPLE_RATE = 16000  # Whisper 最佳採樣率，與麥克風錄音一致
+
+
+def _resample_to_16k(samples: np.ndarray, orig_sr: int) -> np.ndarray:
+    """重採樣至 16kHz（與麥克風一致，有助改善辨識與修復亂碼）"""
+    if orig_sr == TARGET_SAMPLE_RATE:
+        s = samples.astype(np.float64) if samples.dtype != np.float64 else samples.copy()
+        if samples.dtype in (np.int16, np.int32):
+            s = s / 32768.0
+        return s
+    if samples.dtype in (np.int16, np.int32):
+        samples = samples.astype(np.float64) / 32768.0
+    else:
+        samples = samples.astype(np.float64)
+    new_len = int(len(samples) * TARGET_SAMPLE_RATE / orig_sr)
+    if new_len < 1:
+        return samples
+    old_indices = np.arange(len(samples))
+    new_indices = np.linspace(0, len(samples) - 1, new_len)
+    return np.interp(new_indices, old_indices, samples)
+
+
 def _samples_to_wav(samples: np.ndarray, sample_rate: int, path: Path) -> None:
-    """將音訊樣本寫入 WAV 檔案（支援 float32 或 int16）"""
+    """將音訊樣本寫入 WAV 檔案（支援 float32、float64、int16），自動重採樣至 16kHz"""
     if samples.ndim > 1:
         samples = samples.mean(axis=0)
-    if samples.dtype == np.float32:
-        samples = np.clip(samples, -1.0, 1.0)
+    samples = _resample_to_16k(samples, sample_rate)
+    sample_rate = TARGET_SAMPLE_RATE
+    if samples.dtype in (np.float32, np.float64):
+        samples = np.clip(samples.astype(np.float64), -1.0, 1.0)
         samples = (samples * 32767).astype(np.int16)
-    elif samples.dtype != np.int16:
-        samples = samples.astype(np.int16)
+    elif samples.dtype not in (np.int16,):
+        if samples.dtype == np.uint8:
+            samples = (samples.astype(np.int16) - 128) * 256
+        else:
+            samples = samples.astype(np.int16)
     with wave.open(str(path), "wb") as wf:
         wf.setnchannels(1)
         wf.setsampwidth(2)
